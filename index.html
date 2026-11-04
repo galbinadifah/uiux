@@ -370,7 +370,7 @@
         data: { labels: [], datasets: [
             { label: 'Suhu (°C)', data: [], borderColor: COLORS.suhu, backgroundColor: COLORS.suhu + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y', spanGaps: true, pointRadius: 2, pointBackgroundColor: COLORS.suhu },
             { label: 'BPM', data: [], borderColor: COLORS.bpm, backgroundColor: COLORS.bpm + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y1', spanGaps: true, pointRadius: 2, pointBackgroundColor: COLORS.bpm },
-            { label: 'Gerak', data: [], borderColor: COLORS.gerak, backgroundColor: COLORS.gerak + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y1', spanGaps: true, pointRadius: 2, hidden: true }
+            { label: 'Gerak', data: [], borderColor: COLORS.gerak, backgroundColor: COLORS.gerak + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y1', spanGaps: true, pointRadius: 2, pointBackgroundColor: COLORS.gerak }
         ] },
         options: mainOpt
     });
@@ -683,7 +683,17 @@
     // =========================================================================
     // MULAI
     // =========================================================================
-    fetchData().then(schedulePoll);
+        // Simpan & pulihkan pilihan chip grafik utama
+    const savedChips = JSON.parse(localStorage.getItem('chipHidden') || '[false,false,false]');
+    document.querySelectorAll('#metric-chips .chip').forEach((c, i) => {
+        mainChart.data.datasets[i].hidden = savedChips[i];
+        c.classList.toggle('off', savedChips[i]);
+    });
+    mainChart.update();
+    document.querySelectorAll('#metric-chips .chip').forEach(c => c.addEventListener('click', () => {
+        localStorage.setItem('chipHidden', JSON.stringify(mainChart.data.datasets.map(d => !!d.hidden)));
+    }));
+        fetchData().then(schedulePoll);
     </script>
 </body>
 </html>
