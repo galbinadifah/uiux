@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Collar - Dashboard Sapi</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0b1120', cardBg: '#1e293b', brandBlue: '#0ea5e9',
+                        brandLight: '#e0f2fe', danger: '#ef4444', success: '#22c55e',
+                        warning: '#f59e0b', purpleBrand: '#8b5cf6'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .text-glow-red { text-shadow: 0 0 10px rgba(239,68,68,.8), 0 0 20px rgba(239,68,68,.5); }
+        .text-glow-green { text-shadow: 0 0 10px rgba(34,197,94,.8); }
+        .tab-content { display: none; animation: fadeIn .3s ease-in-out; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .rbtn { padding: .4rem .8rem; border-radius: .5rem; font-size: .8rem; background: #0f172a; color: #cbd5e1; border: 1px solid #334155; transition: all .2s; }
+        .rbtn:hover { border-color: #0ea5e9; }
+        .rbtn.active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; font-weight: 600; }
+        .chip { padding: .3rem .75rem; border-radius: 999px; font-size: .75rem; border: 1px solid; transition: all .2s; cursor: pointer; }
+        .chip.off { opacity: .35; }
+        .empty-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; color: #64748b; font-size: .9rem; pointer-events: none; }
+        input[type="date"] { color-scheme: dark; }
+    </style>
+</head>
+<body class="bg-darkBg text-white font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="border-b border-slate-700 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="p-2 bg-brandBlue/20 rounded-lg text-brandBlue shrink-0"><i class="fa-solid fa-satellite-dish"></i></div>
+                <h1 class="font-bold text-lg sm:text-xl tracking-wide text-brandLight truncate">SmartCollar<span class="text-brandBlue">.IoT</span></h1>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 shrink-0">
+                <span id="conn-dot" class="h-2.5 w-2.5 rounded-full bg-slate-500"></span>
+                <span id="conn-text">Memuat...</span>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 sm:mt-0">
+            <ul class="flex flex-wrap justify-center gap-1 sm:gap-2 text-sm font-medium text-center border-b border-slate-700 pb-px" id="myTab">
+                <li><button class="tab-btn inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-brandBlue border-brandBlue" data-tab="utama">Dashboard Utama</button></li>
+                <li><button class="tab-btn inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-slate-400 border-transparent hover:text-slate-300" data-tab="suhu"><i class="fa-solid fa-temperature-half mr-2"></i>Suhu</button></li>
+                <li><button class="tab-btn inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-slate-400 border-transparent hover:text-slate-300" data-tab="bpm"><i class="fa-solid fa-heart-pulse mr-2"></i>BPM</button></li>
+                <li><button class="tab-btn inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-slate-400 border-transparent hover:text-slate-300" data-tab="gerak"><i class="fa-solid fa-cow mr-2"></i>Gerak</button></li>
+                <li><button class="tab-btn inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-slate-400 border-transparent hover:text-slate-300" data-tab="estrus"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Riwayat Estrus</button></li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+
+        <!-- TOOLBAR FILTER (berlaku untuk semua tab) -->
+        <section class="bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-5 mb-6 space-y-4">
+            <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-solid fa-cow mr-1 text-brandBlue"></i>Sapi</label>
+                    <select id="sapi-selector" class="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 outline-none cursor-pointer w-full lg:w-44">
+                        <option value="SAPI-01">Sapi #01</option>
+                        <option value="SAPI-02">Sapi #02</option>
+                        <option value="SAPI-03">Sapi #03</option>
+                        <option value="SAPI-04">Sapi #04</option>
+                        <option value="SAPI-05">Sapi #05</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-regular fa-clock mr-1 text-brandBlue"></i>Rentang waktu</label>
+                    <div id="range-btns" class="flex flex-wrap gap-2">
+                        <button class="rbtn active" data-range="live">Live</button>
+                        <button class="rbtn" data-range="1h">1 Jam</button>
+                        <button class="rbtn" data-range="6h">6 Jam</button>
+                        <button class="rbtn" data-range="today">Hari Ini</button>
+                        <button class="rbtn" data-range="7d">7 Hari</button>
+                        <button class="rbtn" data-range="all">Semua</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-regular fa-calendar mr-1 text-brandBlue"></i>Pilih tanggal</label>
+                    <input type="date" id="date-picker" class="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 outline-none w-full lg:w-44">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-solid fa-layer-group mr-1 text-brandBlue"></i>Rata-rata per</label>
+                    <select id="interval-selector" class="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 outline-none cursor-pointer w-full lg:w-36">
+                        <option value="auto">Otomatis</option>
+                        <option value="0">Data mentah</option>
+                        <option value="60000">1 menit</option>
+                        <option value="300000">5 menit</option>
+                        <option value="900000">15 menit</option>
+                        <option value="3600000">1 jam</option>
+                        <option value="21600000">6 jam</option>
+                        <option value="86400000">1 hari</option>
+                    </select>
+                </div>
+            </div>
+            <div id="range-info" class="text-xs text-slate-400"></div>
+        </section>
+
+        <!-- TAB: DASHBOARD UTAMA -->
+        <div id="view-utama" class="tab-content active">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+                <div class="lg:col-span-7 bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+                        <h2 class="text-slate-300 font-semibold text-base sm:text-lg">Grafik Pemantauan Terpadu</h2>
+                        <div class="flex flex-wrap gap-2" id="metric-chips">
+                            <button class="chip" data-metric="0" style="color:#ef4444;border-color:#ef4444">Suhu</button>
+                            <button class="chip" data-metric="1" style="color:#8b5cf6;border-color:#8b5cf6">BPM</button>
+                            <button class="chip off" data-metric="2" style="color:#f59e0b;border-color:#f59e0b">Gerak</button>
+                        </div>
+                    </div>
+                    <div class="relative w-full flex-grow min-h-[260px] sm:min-h-[340px]">
+                        <canvas id="mainChart"></canvas>
+                        <div class="empty-msg" id="empty-main">Tidak ada data pada rentang ini</div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 content-start">
+                    <div class="bg-cardBg border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg">
+                        <div class="flex justify-between items-start mb-4"><div class="text-slate-400 font-medium text-sm">Suhu Tubuh</div><div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><i class="fa-solid fa-temperature-half"></i></div></div>
+                        <div class="flex items-baseline gap-2"><span id="utama-suhu" class="text-3xl font-bold text-white">--.-</span><span class="text-sm text-slate-400">°C</span></div>
+                    </div>
+                    <div class="bg-cardBg border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg">
+                        <div class="flex justify-between items-start mb-4"><div class="text-slate-400 font-medium text-sm">Detak Jantung</div><div class="p-2 bg-purpleBrand/10 text-purpleBrand rounded-lg"><i class="fa-solid fa-heart-pulse"></i></div></div>
+                        <div class="flex items-baseline gap-2"><span id="utama-bpm" class="text-3xl font-bold text-white">--</span><span class="text-sm text-slate-400">BPM</span></div>
+                    </div>
+                    <div class="bg-cardBg border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg">
+                        <div class="flex justify-between items-start mb-4"><div class="text-slate-400 font-medium text-sm">Aktivitas Gerak</div><div class="p-2 bg-warning/10 text-warning rounded-lg"><i class="fa-solid fa-cow"></i></div></div>
+                        <div class="flex items-baseline gap-2"><span id="utama-gerak" class="text-3xl font-bold text-white">--</span><span class="text-sm text-slate-400">kali/menit</span></div>
+                    </div>
+                    <div id="status-card" class="bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-center items-center text-center transition-all duration-300">
+                        <div class="text-slate-400 font-medium mb-1 uppercase tracking-wider text-xs">Kesimpulan Status</div>
+                        <div id="utama-status" class="text-lg sm:text-xl font-bold mt-1 text-slate-300">MEMUAT...</div>
+                        <div id="status-sub" class="text-xs text-slate-500 mt-1"></div>
+                    </div>
+
+                    <!-- Ringkasan rentang terpilih -->
+                    <div class="sm:col-span-2 bg-cardBg border border-slate-700 rounded-2xl p-4 shadow-lg">
+                        <div class="text-slate-400 font-semibold uppercase tracking-wider text-xs mb-3">Ringkasan rentang terpilih</div>
+                        <div class="grid grid-cols-2 gap-3 text-center">
+                            <div class="bg-slate-900/60 rounded-xl p-3"><div class="text-[11px] text-slate-400">Rata-rata Suhu</div><div class="text-lg font-bold text-rose-400"><span id="sum-suhu">--</span> °C</div></div>
+                            <div class="bg-slate-900/60 rounded-xl p-3"><div class="text-[11px] text-slate-400">Rata-rata BPM</div><div class="text-lg font-bold text-purpleBrand"><span id="sum-bpm">--</span></div></div>
+                            <div class="bg-slate-900/60 rounded-xl p-3"><div class="text-[11px] text-slate-400">Rata-rata Gerak</div><div class="text-lg font-bold text-warning"><span id="sum-gerak">--</span> /mnt</div></div>
+                            <div class="bg-slate-900/60 rounded-xl p-3"><div class="text-[11px] text-slate-400">Data Estrus</div><div class="text-lg font-bold text-red-400"><span id="sum-estrus">0</span> <span class="text-xs font-normal text-slate-500">dari <span id="sum-total">0</span></span></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB SUHU -->
+        <div id="view-suhu" class="tab-content">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 class="text-xl sm:text-2xl font-bold text-white"><i class="fa-solid fa-temperature-half text-rose-500 mr-3"></i>Dashboard Suhu</h2>
+                <div class="bg-rose-500/10 text-rose-400 px-4 py-2 rounded-lg font-bold text-xl sm:text-2xl text-center"><span id="detail-suhu">--.-</span> °C</div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl"><div class="relative w-full h-72 sm:h-96"><canvas id="suhuChart"></canvas><div class="empty-msg" id="empty-suhu">Tidak ada data pada rentang ini</div></div></div>
+                <div class="bg-cardBg border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+                    <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2">Statistik Rentang</h3>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Min</div><div class="font-bold" id="suhu-min">--</div></div>
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Rata-rata</div><div class="font-bold" id="suhu-avg">--</div></div>
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Maks</div><div class="font-bold" id="suhu-max">--</div></div>
+                    </div>
+                    <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2 pt-2">Informasi Suhu</h3>
+                    <ul class="text-sm space-y-3 text-slate-400">
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Normal: 38.0 - 38.5 °C</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Demam/Estrus: &gt; <span class="ml-1" id="lim-suhu">39.0</span> °C</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB BPM -->
+        <div id="view-bpm" class="tab-content">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 class="text-xl sm:text-2xl font-bold text-white"><i class="fa-solid fa-heart-pulse text-purpleBrand mr-3"></i>Dashboard BPM</h2>
+                <div class="bg-purpleBrand/10 text-purpleBrand px-4 py-2 rounded-lg font-bold text-xl sm:text-2xl text-center"><span id="detail-bpm">--</span> BPM</div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl"><div class="relative w-full h-72 sm:h-96"><canvas id="bpmChart"></canvas><div class="empty-msg" id="empty-bpm">Tidak ada data pada rentang ini</div></div></div>
+                <div class="bg-cardBg border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+                    <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2">Statistik Rentang</h3>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Min</div><div class="font-bold" id="bpm-min">--</div></div>
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Rata-rata</div><div class="font-bold" id="bpm-avg">--</div></div>
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Maks</div><div class="font-bold" id="bpm-max">--</div></div>
+                    </div>
+                    <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2 pt-2">Informasi Detak Jantung</h3>
+                    <ul class="text-sm space-y-3 text-slate-400">
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Istirahat: 48 - 60 BPM</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus: &gt; <span class="ml-1" id="lim-bpm">85</span> BPM</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB GERAK -->
+        <div id="view-gerak" class="tab-content">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h2 class="text-xl sm:text-2xl font-bold text-white"><i class="fa-solid fa-cow text-warning mr-3"></i>Dashboard Gerak</h2>
+                <div class="bg-warning/10 text-warning px-4 py-2 rounded-lg font-bold text-xl sm:text-2xl text-center"><span id="detail-gerak">--</span> /Menit</div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl"><div class="relative w-full h-72 sm:h-96"><canvas id="gerakChart"></canvas><div class="empty-msg" id="empty-gerak">Tidak ada data pada rentang ini</div></div></div>
+                <div class="bg-cardBg border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+                    <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2">Statistik Rentang</h3>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Min</div><div class="font-bold" id="gerak-min">--</div></div>
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Rata-rata</div><div class="font-bold" id="gerak-avg">--</div></div>
+                        <div class="bg-slate-900/60 rounded-lg p-2"><div class="text-[11px] text-slate-400">Maks</div><div class="font-bold" id="gerak-max">--</div></div>
+                    </div>
+                    <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2 pt-2">Informasi Pergerakan</h3>
+                    <div class="w-full bg-slate-700 rounded-full h-2"><div id="gerak-bar" class="bg-warning h-2 rounded-full transition-all duration-500" style="width:0%"></div></div>
+                    <ul class="text-sm space-y-3 text-slate-400">
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus (Birahi): &gt; <span class="mx-1" id="lim-gerak">3</span> gerakan per menit</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB RIWAYAT ESTRUS -->
+        <div id="view-estrus" class="tab-content">
+            <div class="mb-6">
+                <h2 class="text-xl sm:text-2xl font-bold text-white"><i class="fa-solid fa-clock-rotate-left text-red-400 mr-3"></i>Riwayat Estrus</h2>
+                <p class="text-sm text-slate-400 mt-1">Episode estrus pada rentang waktu yang dipilih (data berurutan berstatus Estrus digabung jadi satu episode).</p>
+            </div>
+            <div class="bg-cardBg border border-slate-700 rounded-2xl shadow-xl overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs uppercase text-slate-400 border-b border-slate-700">
+                        <tr><th class="px-4 py-3">Mulai</th><th class="px-4 py-3">Selesai</th><th class="px-4 py-3">Durasi</th><th class="px-4 py-3">Suhu maks</th><th class="px-4 py-3">BPM maks</th><th class="px-4 py-3">Gerak maks</th></tr>
+                    </thead>
+                    <tbody id="estrus-body"></tbody>
+                </table>
+                <div id="estrus-empty" class="p-8 text-center text-slate-500 text-sm hidden">Tidak ada estrus pada rentang ini 🎉</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // =========================================================================
+    // KONFIGURASI
+    // =========================================================================
+    const CFG = {
+        API_URL: "https://script.google.com/macros/s/AKfycbzzozSlW6DMvELtriK9uLe57vGI0-3ok06NypFJmG5sjqxQ8l2xPTFiuedKvglH6SkF/exec",
+        POLL_LIVE_MS: 5000,     // refresh saat mode Live
+        POLL_HISTORY_MS: 30000, // refresh saat melihat histori
+        LIVE_POINTS: 30,        // jumlah data terakhir di mode Live
+        STALE_SEC: 120,         // lebih dari ini dianggap "data lama"
+        LIMIT: { suhu: 39.0, bpm: 85, gerak: 3 } // garis batas estrus di grafik
+    };
+    const MS = { min: 60000, hour: 3600000, day: 86400000 };
+    const COLORS = { suhu: '#ef4444', bpm: '#8b5cf6', gerak: '#f59e0b' };
+
+    const state = { all: [], sapi: 'SAPI-01', range: 'live', date: '', interval: 'auto', error: false, latestT: null, hasLoaded: false };
+    const $ = id => document.getElementById(id);
+
+    $('lim-suhu').innerText = CFG.LIMIT.suhu.toFixed(1);
+    $('lim-bpm').innerText = CFG.LIMIT.bpm;
+    $('lim-gerak').innerText = CFG.LIMIT.gerak;
+
+    // =========================================================================
+    // UTIL WAKTU
+    // =========================================================================
+    function parseTs(v) {
+        if (v instanceof Date) return v.getTime();
+        if (typeof v === 'number') return v;
+        if (typeof v !== 'string') return NaN;
+        let t = Date.parse(v);
+        if (!isNaN(t)) return t;
+        // format dd/mm/yyyy HH:mm:ss
+        const m = v.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})[ T,]+(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?/);
+        if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)).getTime();
+        return NaN;
+    }
+    const fmtTime = (t, sec) => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...(sec ? { second: '2-digit' } : {}), hour12: false });
+    const fmtDate = t => new Date(t).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+    const fmtDateTime = t => `${fmtDate(t)} ${fmtTime(t)}`;
+    const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+    function fmtAgo(sec) {
+        if (sec < 60) return `${sec} dtk lalu`;
+        if (sec < 3600) return `${Math.floor(sec / 60)} mnt lalu`;
+        if (sec < 86400) return `${Math.floor(sec / 3600)} jam lalu`;
+        return `${Math.floor(sec / 86400)} hari lalu`;
+    }
+    function fmtDur(ms) {
+        const m = Math.round(ms / MS.min);
+        if (m < 1) return '< 1 mnt';
+        if (m < 60) return `${m} mnt`;
+        const h = Math.floor(m / 60), r = m % 60;
+        return r ? `${h} jam ${r} mnt` : `${h} jam`;
+    }
+    function sizeName(s) {
+        return ({ 0: 'data mentah', 60000: '1 menit', 300000: '5 menit', 900000: '15 menit', 3600000: '1 jam', 21600000: '6 jam', 86400000: '1 hari' })[s] || `${s / MS.min} menit`;
+    }
+    function floorTs(t, size) {
+        const off = new Date(t).getTimezoneOffset() * MS.min; // sejajarkan dengan zona waktu lokal
+        return Math.floor((t - off) / size) * size + off;
+    }
+    function autoSize(span) {
+        if (span <= MS.hour) return MS.min;
+        if (span <= 6 * MS.hour) return 5 * MS.min;
+        if (span <= 30 * MS.hour) return MS.hour;
+        if (span <= 10 * MS.day) return 6 * MS.hour;
+        return MS.day;
+    }
+
+    // =========================================================================
+    // CHART
+    // =========================================================================
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    function baseOptions() {
+        return {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 12, padding: 15, color: '#e2e8f0' } },
+                tooltip: {
+                    backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1, padding: 10,
+                    callbacks: {
+                        title: items => {
+                            const c = items[0].chart, p = c._pts && c._pts[items[0].dataIndex];
+                            if (!p) return '';
+                            return c._size >= MS.day ? fmtDate(p.t) : fmtDateTime(p.t);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { color: '#1e293b' }, ticks: { maxTicksLimit: 8, maxRotation: 0, autoSkip: true } },
+                y: { grid: { color: '#334155' } }
+            }
+        };
+    }
+
+    function makeMetricChart(canvasId, label, color, limit, limLabel, yMin, yMax) {
+        const opt = baseOptions();
+        opt.scales.y.suggestedMin = yMin; opt.scales.y.suggestedMax = yMax;
+        return new Chart($(canvasId).getContext('2d'), {
+            type: 'line',
+            data: { labels: [], datasets: [
+                { label, data: [], borderColor: color, backgroundColor: color + '33', fill: true, tension: 0.3, borderWidth: 2, spanGaps: true, pointRadius: 3, pointBackgroundColor: color },
+                { label: limLabel, data: [], borderColor: '#ef4444', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0, fill: false }
+            ] },
+            options: opt
+        });
+    }
+
+    const mainOpt = baseOptions();
+    mainOpt.scales.y = { type: 'linear', position: 'left', grid: { color: '#334155' }, suggestedMin: 36, suggestedMax: 41, title: { display: true, text: 'Suhu (°C)', color: '#ef4444' } };
+    mainOpt.scales.y1 = { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, suggestedMin: 0, title: { display: true, text: 'BPM / Gerak', color: '#8b5cf6' } };
+    const mainChart = new Chart($('mainChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets: [
+            { label: 'Suhu (°C)', data: [], borderColor: COLORS.suhu, backgroundColor: COLORS.suhu + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y', spanGaps: true, pointRadius: 2, pointBackgroundColor: COLORS.suhu },
+            { label: 'BPM', data: [], borderColor: COLORS.bpm, backgroundColor: COLORS.bpm + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y1', spanGaps: true, pointRadius: 2, pointBackgroundColor: COLORS.bpm },
+            { label: 'Gerak', data: [], borderColor: COLORS.gerak, backgroundColor: COLORS.gerak + '22', borderWidth: 2, tension: 0.3, yAxisID: 'y1', spanGaps: true, pointRadius: 2, hidden: true }
+        ] },
+        options: mainOpt
+    });
+
+    const suhuChart = makeMetricChart('suhuChart', 'Suhu (°C)', COLORS.suhu, CFG.LIMIT.suhu, `Batas estrus (${CFG.LIMIT.suhu})`, 36, 41);
+    const bpmChart = makeMetricChart('bpmChart', 'BPM', COLORS.bpm, CFG.LIMIT.bpm, `Batas estrus (${CFG.LIMIT.bpm})`, 40, 110);
+    const gerakChart = makeMetricChart('gerakChart', 'Gerak / menit', COLORS.gerak, CFG.LIMIT.gerak, `Batas estrus (${CFG.LIMIT.gerak})`, 0, 10);
+    gerakChart.options.scales.y.beginAtZero = true;
+
+    // =========================================================================
+    // AMBIL DATA
+    // =========================================================================
+    function parseRow(r) {
+        const t = parseTs(r.timestamp);
+        if (isNaN(t)) return null;
+        return {
+            t, id: String(r.id_kalung || '').trim(),
+            suhu: parseFloat(r.suhu), bpm: parseInt(r.detak_jantung), gerak: parseInt(r.gerak),
+            estrus: String(r.status || '').trim().toUpperCase() === 'ESTRUS',
+            status: r.status
+        };
+    }
+
+    let fetching = false, pollTimer = null;
+    async function fetchData() {
+        if (fetching) return;
+        fetching = true;
+        try {
+            const res = await fetch(CFG.API_URL, { cache: 'no-store' });
+            const raw = await res.json();
+            const arr = Array.isArray(raw) ? raw : (raw.data || []);
+            state.all = arr.map(parseRow).filter(Boolean).sort((a, b) => a.t - b.t);
+            state.error = false; state.hasLoaded = true;
+        } catch (e) {
+            console.error('Gagal mengambil data:', e);
+            state.error = true;
+        } finally { fetching = false; }
+        render();
+    }
+    function schedulePoll() {
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(async () => { await fetchData(); schedulePoll(); }, state.range === 'live' ? CFG.POLL_LIVE_MS : CFG.POLL_HISTORY_MS);
+    }
+
+    // =========================================================================
+    // OLAH DATA SESUAI FILTER
+    // =========================================================================
+    function getWindow() {
+        const now = Date.now();
+        switch (state.range) {
+            case '1h': return { start: now - MS.hour, end: now };
+            case '6h': return { start: now - 6 * MS.hour, end: now };
+            case '7d': return { start: now - 7 * MS.day, end: now };
+            case 'today': { const d = new Date(); d.setHours(0, 0, 0, 0); return { start: d.getTime(), end: d.getTime() + MS.day }; }
+            case 'date': {
+                const [y, m, d] = state.date.split('-').map(Number);
+                const s = new Date(y, m - 1, d).getTime();
+                return { start: s, end: s + MS.day };
+            }
+            default: return { start: null, end: null }; // live & all
+        }
+    }
+
+    function getView() {
+        const rows = state.all.filter(d => d.id === state.sapi);
+        const win = getWindow();
+        let view;
+        if (state.range === 'live') view = rows.slice(-CFG.LIVE_POINTS);
+        else if (win.start != null) view = rows.filter(d => d.t >= win.start && d.t < win.end);
+        else view = rows;
+
+        let size;
+        if (state.range === 'live') size = 0;
+        else if (state.interval !== 'auto') size = parseInt(state.interval);
+        else {
+            const span = win.start != null ? (win.end - win.start) : (view.length ? view[view.length - 1].t - view[0].t : 0);
+            size = autoSize(span);
+        }
+        return { rows, view, win, size };
+    }
+
+    function bucketize(view, size, win) {
+        if (!size) return view.map(r => ({ t: r.t, suhu: r.suhu, bpm: r.bpm, gerak: r.gerak, estrus: r.estrus }));
+        const map = new Map();
+        for (const r of view) {
+            const key = floorTs(r.t, size);
+            let b = map.get(key);
+            if (!b) { b = { t: key, s: 0, sn: 0, b: 0, bn: 0, g: 0, gn: 0, estrus: false }; map.set(key, b); }
+            if (isFinite(r.suhu)) { b.s += r.suhu; b.sn++; }
+            if (isFinite(r.bpm)) { b.b += r.bpm; b.bn++; }
+            if (isFinite(r.gerak)) { b.g += r.gerak; b.gn++; }
+            if (r.estrus) b.estrus = true;
+        }
+        const out = new Map();
+        for (const [k, b] of map) out.set(k, {
+            t: k, estrus: b.estrus,
+            suhu: b.sn ? +(b.s / b.sn).toFixed(2) : null,
+            bpm: b.bn ? Math.round(b.b / b.bn) : null,
+            gerak: b.gn ? +(b.g / b.gn).toFixed(1) : null
+        });
+        // isi bucket kosong agar sumbu waktu utuh (celah data terlihat)
+        if (view.length || win.start != null) {
+            const from = floorTs(win.start != null ? win.start : view[0].t, size);
+            const to = win.end != null ? win.end : view[view.length - 1].t;
+            if ((to - from) / size <= 1500) {
+                for (let t = from; t < to; t += size) if (!out.has(t)) out.set(t, { t, suhu: null, bpm: null, gerak: null, estrus: false });
+            }
+        }
+        return [...out.values()].sort((a, b) => a.t - b.t);
+    }
+
+    const stat = arr => {
+        const v = arr.filter(x => isFinite(x));
+        if (!v.length) return null;
+        return { min: Math.min(...v), max: Math.max(...v), avg: v.reduce((a, b) => a + b, 0) / v.length };
+    };
+
+    // =========================================================================
+    // RENDER
+    // =========================================================================
+    function labelFor(t, size, multiDay, live) {
+        if (size >= MS.day) return fmtDate(t);
+        if (multiDay) return `${fmtDate(t)} ${fmtTime(t)}`;
+        return fmtTime(t, live);
+    }
+
+    function setMetricChart(chart, key, color, limit, pts, labels) {
+        chart._pts = pts;
+        chart.data.labels = labels;
+        const ds = chart.data.datasets[0];
+        ds.data = pts.map(p => p[key]);
+        const many = pts.length > 60;
+        ds.pointRadius = pts.map(p => p.estrus ? 5 : (many ? 0 : 3));
+        ds.pointBackgroundColor = pts.map(p => p.estrus ? '#ef4444' : color);
+        chart.data.datasets[1].data = pts.map(() => limit);
+        chart.update();
+    }
+
+    function render() {
+        const { rows, view, win, size } = getView();
+        const latest = rows[rows.length - 1];
+        state.latestT = latest ? latest.t : null;
+
+        // --- kartu nilai terkini
+        $('utama-suhu').innerText = latest && isFinite(latest.suhu) ? latest.suhu.toFixed(1) : '--.-';
+        $('detail-suhu').innerText = $('utama-suhu').innerText;
+        $('utama-bpm').innerText = latest && isFinite(latest.bpm) ? latest.bpm : '--';
+        $('detail-bpm').innerText = $('utama-bpm').innerText;
+        $('utama-gerak').innerText = latest && isFinite(latest.gerak) ? latest.gerak : '--';
+        $('detail-gerak').innerText = $('utama-gerak').innerText;
+        $('gerak-bar').style.width = latest && isFinite(latest.gerak) ? Math.min(latest.gerak / 200 * 100, 100) + '%' : '0%';
+
+        // --- status
+        const sEl = $('utama-status'), sCard = $('status-card');
+        if (!state.hasLoaded) {
+            sEl.innerText = state.error ? 'ERROR KONEKSI API' : 'MEMUAT...';
+            sEl.className = 'text-lg sm:text-xl font-bold mt-1 ' + (state.error ? 'text-red-400' : 'text-slate-300');
+        } else if (!latest) {
+            sEl.innerText = 'BELUM ADA DATA';
+            sEl.className = 'text-lg sm:text-xl font-bold mt-1 text-slate-500';
+            sCard.className = 'bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-center items-center text-center transition-all duration-300';
+        } else if (latest.estrus) {
+            sEl.innerText = 'ESTRUS TERDETEKSI!';
+            sEl.className = 'text-lg sm:text-xl font-bold mt-1 text-red-500 text-glow-red animate-pulse';
+            sCard.className = 'bg-rose-950/30 border-2 border-red-500 rounded-2xl p-4 sm:p-5 shadow-[0_0_15px_rgba(239,68,68,0.3)] flex flex-col justify-center items-center text-center transition-all duration-300';
+        } else {
+            sEl.innerText = 'NORMAL & SEHAT';
+            sEl.className = 'text-lg sm:text-xl font-bold mt-1 text-green-400 text-glow-green';
+            sCard.className = 'bg-cardBg border border-slate-700 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-center items-center text-center transition-all duration-300 hover:border-green-500/50';
+        }
+
+        // --- grafik
+        const pts = bucketize(view, size, win);
+        const valid = pts.filter(p => p.suhu != null || p.bpm != null || p.gerak != null);
+        const multiDay = pts.length > 1 && !sameDay(pts[0].t, pts[pts.length - 1].t);
+        const labels = pts.map(p => labelFor(p.t, size, multiDay, state.range === 'live'));
+
+        mainChart._pts = pts; mainChart._size = size;
+        suhuChart._size = bpmChart._size = gerakChart._size = size;
+        mainChart.data.labels = labels;
+        mainChart.data.datasets[0].data = pts.map(p => p.suhu);
+        mainChart.data.datasets[1].data = pts.map(p => p.bpm);
+        mainChart.data.datasets[2].data = pts.map(p => p.gerak);
+        const many = pts.length > 60;
+        mainChart.data.datasets.forEach(ds => ds.pointRadius = many ? 0 : 2);
+        mainChart.update();
+
+        setMetricChart(suhuChart, 'suhu', COLORS.suhu, CFG.LIMIT.suhu, pts, labels);
+        setMetricChart(bpmChart, 'bpm', COLORS.bpm, CFG.LIMIT.bpm, pts, labels);
+        setMetricChart(gerakChart, 'gerak', COLORS.gerak, CFG.LIMIT.gerak, pts, labels);
+
+        const empty = valid.length === 0;
+        ['main', 'suhu', 'bpm', 'gerak'].forEach(k => $('empty-' + k).style.display = empty ? 'flex' : 'none');
+
+        // --- info rentang
+        let info;
+        if (!view.length) info = 'Tidak ada data pada rentang ini.';
+        else if (state.range === 'live') info = `Mode Live: ${view.length} data terakhir (diperbarui otomatis tiap ${CFG.POLL_LIVE_MS / 1000} detik).`;
+        else {
+            const a = win.start != null ? win.start : view[0].t, b = win.end != null ? Math.min(win.end, Date.now()) : view[view.length - 1].t;
+            info = `${fmtDateTime(a)} – ${fmtDateTime(b)} · ${view.length} data ditampilkan sebagai ${valid.length} titik (rata-rata per ${sizeName(size)}).`;
+        }
+        $('range-info').innerText = info;
+
+        // --- statistik
+        const sts = { suhu: stat(view.map(d => d.suhu)), bpm: stat(view.map(d => d.bpm)), gerak: stat(view.map(d => d.gerak)) };
+        const f = (v, d) => v == null ? '--' : v.toFixed(d);
+        ['suhu', 'bpm', 'gerak'].forEach(k => {
+            const d = k === 'suhu' ? 1 : (k === 'bpm' ? 0 : 1);
+            const s = sts[k];
+            $(k + '-min').innerText = s ? f(s.min, d) : '--';
+            $(k + '-avg').innerText = s ? f(s.avg, d) : '--';
+            $(k + '-max').innerText = s ? f(s.max, d) : '--';
+            $('sum-' + k).innerText = s ? f(s.avg, d) : '--';
+        });
+        $('sum-estrus').innerText = view.filter(d => d.estrus).length;
+        $('sum-total').innerText = view.length;
+
+        renderEstrus(view);
+        renderAge();
+    }
+
+    function renderEstrus(view) {
+        const events = [];
+        let cur = null;
+        for (const r of view) {
+            if (r.estrus) {
+                if (!cur) { cur = { start: r.t, end: r.t, suhu: -Infinity, bpm: -Infinity, gerak: -Infinity }; }
+                cur.end = r.t;
+                if (isFinite(r.suhu)) cur.suhu = Math.max(cur.suhu, r.suhu);
+                if (isFinite(r.bpm)) cur.bpm = Math.max(cur.bpm, r.bpm);
+                if (isFinite(r.gerak)) cur.gerak = Math.max(cur.gerak, r.gerak);
+            } else if (cur) { events.push(cur); cur = null; }
+        }
+        if (cur) events.push(cur);
+        events.reverse();
+
+        const num = (v, d) => isFinite(v) ? v.toFixed(d) : '--';
+        $('estrus-body').innerHTML = events.slice(0, 50).map(e => `
+            <tr class="border-b border-slate-700/50 hover:bg-slate-800/50">
+                <td class="px-4 py-3">${fmtDateTime(e.start)}</td>
+                <td class="px-4 py-3">${fmtDateTime(e.end)}</td>
+                <td class="px-4 py-3">${fmtDur(e.end - e.start)}</td>
+                <td class="px-4 py-3 text-rose-400">${num(e.suhu, 1)} °C</td>
+                <td class="px-4 py-3 text-purple-400">${num(e.bpm, 0)}</td>
+                <td class="px-4 py-3 text-amber-400">${num(e.gerak, 0)}</td>
+            </tr>`).join('');
+        $('estrus-empty').classList.toggle('hidden', events.length > 0);
+    }
+
+    // Indikator koneksi / umur data (diperbarui tiap detik)
+    function renderAge() {
+        const dot = $('conn-dot'), txt = $('conn-text'), sub = $('status-sub');
+        if (state.error) {
+            dot.className = 'h-2.5 w-2.5 rounded-full bg-red-500';
+            txt.innerText = 'Koneksi gagal'; sub.innerText = ''; return;
+        }
+        if (!state.hasLoaded) { dot.className = 'h-2.5 w-2.5 rounded-full bg-slate-500'; txt.innerText = 'Memuat...'; return; }
+        if (state.latestT == null) { dot.className = 'h-2.5 w-2.5 rounded-full bg-slate-500'; txt.innerText = 'Belum ada data'; sub.innerText = ''; return; }
+        const sec = Math.max(0, Math.round((Date.now() - state.latestT) / 1000));
+        const fresh = sec <= CFG.STALE_SEC;
+        dot.className = 'h-2.5 w-2.5 rounded-full ' + (fresh ? 'bg-green-500 animate-pulse' : 'bg-amber-500');
+        txt.innerText = fresh ? `LIVE · ${fmtAgo(sec)}` : `Data lama · ${fmtAgo(sec)}`;
+        sub.innerText = `Data terakhir: ${fmtDateTime(state.latestT)}` + (fresh ? '' : ' (kalung mungkin offline)');
+    }
+    setInterval(renderAge, 1000);
+
+    // =========================================================================
+    // EVENT
+    // =========================================================================
+    function switchTab(id) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        $('view-' + id).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            const on = b.dataset.tab === id;
+            b.classList.toggle('text-brandBlue', on); b.classList.toggle('border-brandBlue', on);
+            b.classList.toggle('text-slate-400', !on); b.classList.toggle('border-transparent', !on);
+        });
+        [mainChart, suhuChart, bpmChart, gerakChart].forEach(c => c.resize());
+    }
+    document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+    function setRange(r) {
+        state.range = r;
+        document.querySelectorAll('.rbtn').forEach(b => b.classList.toggle('active', b.dataset.range === r));
+        if (r !== 'date') $('date-picker').value = '';
+        render(); schedulePoll();
+    }
+    document.querySelectorAll('.rbtn').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
+
+    $('date-picker').max = new Date(Date.now() - new Date().getTimezoneOffset() * MS.min).toISOString().slice(0, 10);
+    $('date-picker').addEventListener('change', e => {
+        if (!e.target.value) return setRange('live');
+        state.date = e.target.value;
+        document.querySelectorAll('.rbtn').forEach(b => b.classList.remove('active'));
+        state.range = 'date';
+        render(); schedulePoll();
+    });
+
+    $('interval-selector').addEventListener('change', e => { state.interval = e.target.value; render(); });
+    $('sapi-selector').addEventListener('change', e => { state.sapi = e.target.value; render(); });
+
+    document.querySelectorAll('#metric-chips .chip').forEach(c => c.addEventListener('click', () => {
+        const i = +c.dataset.metric, ds = mainChart.data.datasets[i];
+        ds.hidden = !ds.hidden;
+        c.classList.toggle('off', ds.hidden);
+        mainChart.update();
+    }));
+
+    // =========================================================================
+    // MULAI
+    // =========================================================================
+    fetchData().then(schedulePoll);
+    </script>
+</body>
+</html>
