@@ -179,8 +179,8 @@
                     </div>
                     <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2 pt-2">Informasi Suhu</h3>
                     <ul class="text-sm space-y-3 text-slate-400">
-                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Normal: 38.0 - 38.5 °C</li>
-                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Demam/Estrus: &gt; <span class="ml-1" id="lim-suhu">39.0</span> °C</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Normal: ≤ <span class="mx-1 lim-suhu">35.5</span> °C</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus: &gt; <span class="mx-1 lim-suhu">35.5</span> °C</li>
                     </ul>
                 </div>
             </div>
@@ -203,8 +203,8 @@
                     </div>
                     <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2 pt-2">Informasi Detak Jantung</h3>
                     <ul class="text-sm space-y-3 text-slate-400">
-                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Istirahat: 48 - 60 BPM</li>
-                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus: &gt; <span class="ml-1" id="lim-bpm">85</span> BPM</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Normal: ≤ <span class="mx-1 lim-bpm">75</span> BPM</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus: &gt; <span class="mx-1 lim-bpm">75</span> BPM</li>
                     </ul>
                 </div>
             </div>
@@ -228,7 +228,8 @@
                     <h3 class="text-slate-400 font-semibold uppercase tracking-wider text-sm border-b border-slate-700 pb-2 pt-2">Informasi Pergerakan</h3>
                     <div class="w-full bg-slate-700 rounded-full h-2"><div id="gerak-bar" class="bg-warning h-2 rounded-full transition-all duration-500" style="width:0%"></div></div>
                     <ul class="text-sm space-y-3 text-slate-400">
-                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus (Birahi): &gt; <span class="mx-1" id="lim-gerak">3</span> gerakan per menit</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-green-500 mr-3 text-[10px]"></i>Normal: ≤ <span class="mx-1 lim-gerak">3</span> gerakan per menit</li>
+                        <li class="flex items-center"><i class="fa-solid fa-circle text-red-500 mr-3 text-[10px]"></i>Estrus (Birahi): &gt; <span class="mx-1 lim-gerak">3</span> gerakan per menit</li>
                     </ul>
                 </div>
             </div>
@@ -262,7 +263,7 @@
         POLL_HISTORY_MS: 30000, // refresh saat melihat histori
         LIVE_POINTS: 30,        // jumlah data terakhir di mode Live
         STALE_SEC: 120,         // lebih dari ini dianggap "data lama"
-        LIMIT: { suhu: 39.0, bpm: 85, gerak: 3 } // garis batas estrus di grafik
+        LIMIT: { suhu: 35.5, bpm: 75, gerak: 3 } // di atas angka ini = estrus
     };
     const MS = { min: 60000, hour: 3600000, day: 86400000 };
     const COLORS = { suhu: '#ef4444', bpm: '#8b5cf6', gerak: '#f59e0b' };
@@ -270,9 +271,10 @@
     const state = { all: [], sapi: 'SAPI-01', range: 'live', date: '', interval: 'auto', error: false, latestT: null, hasLoaded: false };
     const $ = id => document.getElementById(id);
 
-    $('lim-suhu').innerText = CFG.LIMIT.suhu.toFixed(1);
-    $('lim-bpm').innerText = CFG.LIMIT.bpm;
-    $('lim-gerak').innerText = CFG.LIMIT.gerak;
+    // Isi otomatis semua teks batas estrus di halaman dari CFG.LIMIT
+    document.querySelectorAll('.lim-suhu').forEach(el => el.innerText = CFG.LIMIT.suhu.toFixed(1));
+    document.querySelectorAll('.lim-bpm').forEach(el => el.innerText = CFG.LIMIT.bpm);
+    document.querySelectorAll('.lim-gerak').forEach(el => el.innerText = CFG.LIMIT.gerak);
 
     // =========================================================================
     // UTIL WAKTU
@@ -364,7 +366,7 @@
     }
 
     const mainOpt = baseOptions();
-    mainOpt.scales.y = { type: 'linear', position: 'left', grid: { color: '#334155' }, suggestedMin: 36, suggestedMax: 41, title: { display: true, text: 'Suhu (°C)', color: '#ef4444' } };
+    mainOpt.scales.y = { type: 'linear', position: 'left', grid: { color: '#334155' }, suggestedMin: 33, suggestedMax: 40, title: { display: true, text: 'Suhu (°C)', color: '#ef4444' } };
     mainOpt.scales.y1 = { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, suggestedMin: 0, title: { display: true, text: 'BPM / Gerak', color: '#8b5cf6' } };
     const mainChart = new Chart($('mainChart').getContext('2d'), {
         type: 'line',
@@ -376,7 +378,7 @@
         options: mainOpt
     });
 
-    const suhuChart = makeMetricChart('suhuChart', 'Suhu (°C)', COLORS.suhu, CFG.LIMIT.suhu, `Batas estrus (${CFG.LIMIT.suhu})`, 36, 41);
+    const suhuChart = makeMetricChart('suhuChart', 'Suhu (°C)', COLORS.suhu, CFG.LIMIT.suhu, `Batas estrus (${CFG.LIMIT.suhu})`, 33, 40);
     const bpmChart = makeMetricChart('bpmChart', 'BPM', COLORS.bpm, CFG.LIMIT.bpm, `Batas estrus (${CFG.LIMIT.bpm})`, 40, 110);
     const gerakChart = makeMetricChart('gerakChart', 'Gerak / menit', COLORS.gerak, CFG.LIMIT.gerak, `Batas estrus (${CFG.LIMIT.gerak})`, 0, 10);
     gerakChart.options.scales.y.beginAtZero = true;
@@ -522,7 +524,8 @@
         $('detail-bpm').innerText = $('utama-bpm').innerText;
         $('utama-gerak').innerText = latest && isFinite(latest.gerak) ? latest.gerak : '--';
         $('detail-gerak').innerText = $('utama-gerak').innerText;
-        $('gerak-bar').style.width = latest && isFinite(latest.gerak) ? Math.min(latest.gerak / 200 * 100, 100) + '%' : '0%';
+        // bar terisi 50% tepat di batas estrus
+        $('gerak-bar').style.width = latest && isFinite(latest.gerak) ? Math.min(latest.gerak / (CFG.LIMIT.gerak * 2) * 100, 100) + '%' : '0%';
 
         // --- status
         const sEl = $('utama-status'), sCard = $('status-card');
@@ -679,22 +682,24 @@
         ds.hidden = !ds.hidden;
         c.classList.toggle('off', ds.hidden);
         mainChart.update();
+        // simpan pilihan chip supaya tidak hilang setelah refresh
+        localStorage.setItem('chipHidden', JSON.stringify(mainChart.data.datasets.map(d => !!d.hidden)));
     }));
 
     // =========================================================================
     // MULAI
     // =========================================================================
-        // Simpan & pulihkan pilihan chip grafik utama
-    const savedChips = JSON.parse(localStorage.getItem('chipHidden') || '[false,false,false]');
-    document.querySelectorAll('#metric-chips .chip').forEach((c, i) => {
-        mainChart.data.datasets[i].hidden = savedChips[i];
-        c.classList.toggle('off', savedChips[i]);
-    });
-    mainChart.update();
-    document.querySelectorAll('#metric-chips .chip').forEach(c => c.addEventListener('click', () => {
-        localStorage.setItem('chipHidden', JSON.stringify(mainChart.data.datasets.map(d => !!d.hidden)));
-    }));
-        fetchData().then(schedulePoll);
+    // Pulihkan pilihan chip grafik utama (default: semua tampil)
+    try {
+        const savedChips = JSON.parse(localStorage.getItem('chipHidden') || '[false,false,false]');
+        document.querySelectorAll('#metric-chips .chip').forEach((c, i) => {
+            mainChart.data.datasets[i].hidden = !!savedChips[i];
+            c.classList.toggle('off', !!savedChips[i]);
+        });
+        mainChart.update();
+    } catch (e) { console.warn('Gagal memulihkan pilihan chip:', e); }
+
+    fetchData().then(schedulePoll);
     </script>
 </body>
 </html>
