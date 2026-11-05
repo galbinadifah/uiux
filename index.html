@@ -95,7 +95,7 @@
                     <input type="date" id="date-picker" class="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 outline-none w-full lg:w-44">
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-solid fa-layer-group mr-1 text-brandBlue"></i>Rata-rata per</label>
+                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-solid fa-layer-group mr-1 text-brandBlue"></i>Interval waktu</label>
                     <select id="interval-selector" class="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 outline-none cursor-pointer w-full lg:w-36">
                         <option value="auto">Otomatis</option>
                         <option value="0">Data mentah</option>
@@ -105,6 +105,13 @@
                         <option value="3600000">1 jam</option>
                         <option value="21600000">6 jam</option>
                         <option value="86400000">1 hari</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1.5"><i class="fa-solid fa-chart-line mr-1 text-brandBlue"></i>Nilai per interval</label>
+                    <select id="agg-selector" class="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 outline-none cursor-pointer w-full lg:w-44">
+                        <option value="max">Tertinggi (Maks)</option>
+                        <option value="avg">Rata-rata</option>
                     </select>
                 </div>
             </div>
@@ -268,7 +275,8 @@
     const MS = { min: 60000, hour: 3600000, day: 86400000 };
     const COLORS = { suhu: '#ef4444', bpm: '#8b5cf6', gerak: '#f59e0b' };
 
-    const state = { all: [], sapi: 'SAPI-01', range: 'live', date: '', interval: 'auto', error: false, latestT: null, hasLoaded: false };
+    // agg: 'max' = nilai tertinggi per interval, 'avg' = rata-rata per interval
+    const state = { all: [], sapi: 'SAPI-01', range: 'live', date: '', interval: 'auto', agg: 'max', error: false, latestT: null, hasLoaded: false };
     const $ = id => document.getElementById(id);
 
     // Isi otomatis semua teks batas estrus di halaman dari CFG.LIMIT
@@ -457,22 +465,26 @@
 
     function bucketize(view, size, win) {
         if (!size) return view.map(r => ({ t: r.t, suhu: r.suhu, bpm: r.bpm, gerak: r.gerak, estrus: r.estrus }));
+        const useMax = state.agg === 'max';
         const map = new Map();
         for (const r of view) {
             const key = floorTs(r.t, size);
             let b = map.get(key);
-            if (!b) { b = { t: key, s: 0, sn: 0, b: 0, bn: 0, g: 0, gn: 0, estrus: false }; map.set(key, b); }
-            if (isFinite(r.suhu)) { b.s += r.suhu; b.sn++; }
-            if (isFinite(r.bpm)) { b.b += r.bpm; b.bn++; }
-            if (isFinite(r.gerak)) { b.g += r.gerak; b.gn++; }
+            if (!b) {
+                b = { t: key, s: 0, sn: 0, sm: -Infinity, b: 0, bn: 0, bm: -Infinity, g: 0, gn: 0, gm: -Infinity, estrus: false };
+                map.set(key, b);
+            }
+            if (isFinite(r.suhu)) { b.s += r.suhu; b.sn++; b.sm = Math.max(b.sm, r.suhu); }
+            if (isFinite(r.bpm)) { b.b += r.bpm; b.bn++; b.bm = Math.max(b.bm, r.bpm); }
+            if (isFinite(r.gerak)) { b.g += r.gerak; b.gn++; b.gm = Math.max(b.gm, r.gerak); }
             if (r.estrus) b.estrus = true;
         }
         const out = new Map();
         for (const [k, b] of map) out.set(k, {
             t: k, estrus: b.estrus,
-            suhu: b.sn ? +(b.s / b.sn).toFixed(2) : null,
-            bpm: b.bn ? Math.round(b.b / b.bn) : null,
-            gerak: b.gn ? +(b.g / b.gn).toFixed(1) : null
+            suhu: b.sn ? (useMax ? +b.sm.toFixed(2) : +(b.s / b.sn).toFixed(2)) : null,
+            bpm: b.bn ? (useMax ? b.bm : Math.round(b.b / b.bn)) : null,
+            gerak: b.gn ? (useMax ? b.gm : +(b.g / b.gn).toFixed(1)) : null
         });
         // isi bucket kosong agar sumbu waktu utuh (celah data terlihat)
         if (view.length || win.start != null) {
@@ -500,10 +512,11 @@
         return fmtTime(t, live);
     }
 
-    function setMetricChart(chart, key, color, limit, pts, labels) {
+    function setMetricChart(chart, key, color, limit, pts, labels, label) {
         chart._pts = pts;
         chart.data.labels = labels;
         const ds = chart.data.datasets[0];
+        ds.label = label;
         ds.data = pts.map(p => p[key]);
         const many = pts.length > 60;
         ds.pointRadius = pts.map(p => p.estrus ? 5 : (many ? 0 : 3));
@@ -552,9 +565,15 @@
         const multiDay = pts.length > 1 && !sameDay(pts[0].t, pts[pts.length - 1].t);
         const labels = pts.map(p => labelFor(p.t, size, multiDay, state.range === 'live'));
 
+        // keterangan di legenda: (maks) / (rata-rata) bila data digabung per interval
+        const aggTxt = size > 0 ? (state.agg === 'max' ? ' (maks)' : ' (rata-rata)') : '';
+
         mainChart._pts = pts; mainChart._size = size;
         suhuChart._size = bpmChart._size = gerakChart._size = size;
         mainChart.data.labels = labels;
+        mainChart.data.datasets[0].label = 'Suhu (°C)' + aggTxt;
+        mainChart.data.datasets[1].label = 'BPM' + aggTxt;
+        mainChart.data.datasets[2].label = 'Gerak' + aggTxt;
         mainChart.data.datasets[0].data = pts.map(p => p.suhu);
         mainChart.data.datasets[1].data = pts.map(p => p.bpm);
         mainChart.data.datasets[2].data = pts.map(p => p.gerak);
@@ -562,9 +581,9 @@
         mainChart.data.datasets.forEach(ds => ds.pointRadius = many ? 0 : 2);
         mainChart.update();
 
-        setMetricChart(suhuChart, 'suhu', COLORS.suhu, CFG.LIMIT.suhu, pts, labels);
-        setMetricChart(bpmChart, 'bpm', COLORS.bpm, CFG.LIMIT.bpm, pts, labels);
-        setMetricChart(gerakChart, 'gerak', COLORS.gerak, CFG.LIMIT.gerak, pts, labels);
+        setMetricChart(suhuChart, 'suhu', COLORS.suhu, CFG.LIMIT.suhu, pts, labels, 'Suhu (°C)' + aggTxt);
+        setMetricChart(bpmChart, 'bpm', COLORS.bpm, CFG.LIMIT.bpm, pts, labels, 'BPM' + aggTxt);
+        setMetricChart(gerakChart, 'gerak', COLORS.gerak, CFG.LIMIT.gerak, pts, labels, 'Gerak / menit' + aggTxt);
 
         const empty = valid.length === 0;
         ['main', 'suhu', 'bpm', 'gerak'].forEach(k => $('empty-' + k).style.display = empty ? 'flex' : 'none');
@@ -575,11 +594,12 @@
         else if (state.range === 'live') info = `Mode Live: ${view.length} data terakhir (diperbarui otomatis tiap ${CFG.POLL_LIVE_MS / 1000} detik).`;
         else {
             const a = win.start != null ? win.start : view[0].t, b = win.end != null ? Math.min(win.end, Date.now()) : view[view.length - 1].t;
-            info = `${fmtDateTime(a)} – ${fmtDateTime(b)} · ${view.length} data ditampilkan sebagai ${valid.length} titik (rata-rata per ${sizeName(size)}).`;
+            const aggName = state.agg === 'max' ? 'nilai tertinggi' : 'rata-rata';
+            info = `${fmtDateTime(a)} – ${fmtDateTime(b)} · ${view.length} data ditampilkan sebagai ${valid.length} titik (${size ? aggName + ' per ' + sizeName(size) : 'data mentah'}).`;
         }
         $('range-info').innerText = info;
 
-        // --- statistik
+        // --- statistik (dihitung dari data mentah)
         const sts = { suhu: stat(view.map(d => d.suhu)), bpm: stat(view.map(d => d.bpm)), gerak: stat(view.map(d => d.gerak)) };
         const f = (v, d) => v == null ? '--' : v.toFixed(d);
         ['suhu', 'bpm', 'gerak'].forEach(k => {
@@ -675,6 +695,7 @@
     });
 
     $('interval-selector').addEventListener('change', e => { state.interval = e.target.value; render(); });
+    $('agg-selector').addEventListener('change', e => { state.agg = e.target.value; render(); });
     $('sapi-selector').addEventListener('change', e => { state.sapi = e.target.value; render(); });
 
     document.querySelectorAll('#metric-chips .chip').forEach(c => c.addEventListener('click', () => {
